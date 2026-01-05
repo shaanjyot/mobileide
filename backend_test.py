@@ -223,7 +223,9 @@ class MobileIDEAPITester:
             
             if response.status_code == 200:
                 data = response.json()
-                if data.get("id") == self.test_file_id:
+                # Handle both 'id' and '_id' fields
+                file_id = data.get("id") or data.get("_id")
+                if file_id == self.test_file_id:
                     self.log_result("Get File by ID", True, f"Retrieved file: {data['name']}")
                     return True
                 else:
