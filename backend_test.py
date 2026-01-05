@@ -129,7 +129,9 @@ class MobileIDEAPITester:
             
             if response.status_code == 200:
                 data = response.json()
-                if data.get("id") == self.test_project_id:
+                # Handle both 'id' and '_id' fields
+                project_id = data.get("id") or data.get("_id")
+                if project_id == self.test_project_id:
                     self.log_result("Get Project by ID", True, f"Retrieved project: {data['name']}")
                     return True
                 else:
