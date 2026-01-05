@@ -297,6 +297,12 @@ export default function EditorScreen() {
           <View style={styles.toolbarRight}>
             <TouchableOpacity 
               style={styles.toolbarButton}
+              onPress={openEnhancedAIChat}
+            >
+              <Ionicons name="sparkles" size={20} color="#a855f7" />
+            </TouchableOpacity>
+            <TouchableOpacity 
+              style={styles.toolbarButton}
               onPress={openAIChat}
             >
               <Ionicons name="chatbubble-outline" size={20} color="#10b981" />
