@@ -194,7 +194,8 @@ class MobileIDEAPITester:
             if response.status_code == 200:
                 data = response.json()
                 if isinstance(data, list):
-                    file_found = any(f.get("id") == self.test_file_id for f in data)
+                    # Handle both 'id' and '_id' fields in file list
+                    file_found = any(f.get("id") == self.test_file_id or f.get("_id") == self.test_file_id for f in data)
                     if file_found:
                         self.log_result("Get Project Files", True, f"Found {len(data)} files including test file")
                         return True
