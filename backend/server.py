@@ -324,6 +324,210 @@ async def get_chat_history(session_id: str, limit: int = 50):
     
     return [ChatMessage(**msg) for msg in reversed(messages)]
 
+# ==================== ENHANCED AI CHAT (CURSOR-LIKE) ====================
+
+@api_router.post("/chat/enhanced", response_model=EnhancedChatResponse)
+async def enhanced_chat(request: EnhancedChatRequest):
+    """
+    Enhanced AI chat with full project context and code generation capabilities.
+    Similar to Cursor AI - can generate, refactor, and create files.
+    """
+    try:
+        api_key = os.environ.get('EMERGENT_LLM_KEY')
+        if not api_key:
+            raise HTTPException(status_code=500, detail="API key not configured")
+        
+        # Build comprehensive context
+        context_parts = []
+        
+        # Get project info
+        project = await db.projects.find_one({"_id": request.project_id})
+        if project:
+            context_parts.append(f"Project: {project['name']}")
+            if project.get('description'):
+                context_parts.append(f"Description: {project['description']}")
+        
+        # Get all files in project for context
+        if request.include_project_context:
+            files = await db.files.find({"project_id": request.project_id}).to_list(100)
+            if files:
+                context_parts.append("\n=== Project Files ===")
+                for f in files:
+                    context_parts.append(f"\n--- {f['name']} ({f['language']}) ---")
+                    # Limit context size - truncate large files
+                    content = f['content'][:1000] if len(f['content']) > 1000 else f['content']
+                    context_parts.append(content)
+                    if len(f['content']) > 1000:
+                        context_parts.append(f"\n... (truncated, {len(f['content'])} chars total)")
+        
+        # Get current file content if specified
+        if request.current_file_id:
+            current_file = await db.files.find_one({"_id": request.current_file_id})
+            if current_file:
+                context_parts.append(f"\n=== Currently Editing: {current_file['name']} ===")
+                context_parts.append(current_file['content'])
+        
+        full_context = "\n".join(context_parts)
+        
+        # Create enhanced system message
+        system_message = """You are an expert AI coding assistant integrated into a mobile IDE (like Cursor AI).
+
+Your capabilities:
+1. **Code Generation**: Generate complete, working code for any language
+2. **File Creation**: Suggest creating new files when needed
+3. **Code Refactoring**: Improve existing code while maintaining functionality
+4. **Multi-file Operations**: Work across multiple files in a project
+5. **Explanations**: Explain code concepts clearly
+
+When suggesting code:
+- Use proper markdown code blocks with language tags (```python, ```javascript, etc.)
+- Be concise but complete
+- Include comments for complex logic
+- Follow best practices
+
+When creating/editing files:
+- Suggest the complete file content
+- Use descriptive file names
+- Include the file extension
+
+Format your responses to be clear and actionable."""
+        
+        if full_context:
+            system_message += f"\n\nCurrent project context:\n{full_context}"
+        
+        # Initialize chat
+        chat = LlmChat(
+            api_key=api_key,
+            session_id=request.session_id,
+            system_message=system_message
+        ).with_model(request.provider, request.model)
+        
+        # Create user message
+        user_message = UserMessage(text=request.message)
+        
+        # Get response
+        response = await chat.send_message(user_message)
+        
+        # Parse response for code blocks and suggested operations
+        code_blocks = []
+        suggested_operations = []
+        
+        # Extract code blocks from response
+        import re
+        code_block_pattern = r'```(\w+)?\n(.*?)```'
+        matches = re.finditer(code_block_pattern, response, re.DOTALL)
+        
+        for match in matches:
+            language = match.group(1) or 'text'
+            code = match.group(2).strip()
+            code_blocks.append({
+                'language': language,
+                'code': code,
+                'can_apply': True
+            })
+        
+        # Store chat history
+        await db.chat_history.insert_one({
+            "session_id": request.session_id,
+            "project_id": request.project_id,
+            "role": "user",
+            "content": request.message,
+            "timestamp": datetime.utcnow()
+        })
+        
+        await db.chat_history.insert_one({
+            "session_id": request.session_id,
+            "project_id": request.project_id,
+            "role": "assistant",
+            "content": response,
+            "code_blocks": code_blocks,
+            "timestamp": datetime.utcnow()
+        })
+        
+        return EnhancedChatResponse(
+            response=response,
+            session_id=request.session_id,
+            suggested_operations=suggested_operations,
+            code_blocks=code_blocks
+        )
+    
+    except Exception as e:
+        logger.error(f"Enhanced chat error: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Chat error: {str(e)}")
+
+@api_router.post("/ai/apply-operation")
+async def apply_ai_operation(request: ApplyAIOperationRequest):
+    """
+    Apply AI-suggested operations: create new file, edit existing file, or refactor code.
+    """
+    try:
+        now = datetime.utcnow()
+        
+        if request.operation == 'create':
+            # Create new file
+            file_doc = {
+                "_id": str(ObjectId()),
+                "project_id": request.project_id,
+                "name": request.file_name,
+                "path": request.file_path,
+                "content": request.content,
+                "language": request.language,
+                "created_at": now,
+                "updated_at": now
+            }
+            await db.files.insert_one(file_doc)
+            
+            # Update project timestamp
+            await db.projects.update_one(
+                {"_id": request.project_id},
+                {"$set": {"updated_at": now}}
+            )
+            
+            return {
+                "success": True,
+                "message": "File created successfully",
+                "file_id": file_doc["_id"],
+                "operation": "create"
+            }
+        
+        elif request.operation in ['edit', 'refactor']:
+            # Update existing file
+            if not request.file_id:
+                raise HTTPException(status_code=400, detail="file_id required for edit/refactor operations")
+            
+            result = await db.files.update_one(
+                {"_id": request.file_id},
+                {"$set": {
+                    "content": request.content,
+                    "updated_at": now
+                }}
+            )
+            
+            if result.matched_count == 0:
+                raise HTTPException(status_code=404, detail="File not found")
+            
+            # Update project timestamp
+            await db.projects.update_one(
+                {"_id": request.project_id},
+                {"$set": {"updated_at": now}}
+            )
+            
+            return {
+                "success": True,
+                "message": f"File {request.operation}ed successfully",
+                "file_id": request.file_id,
+                "operation": request.operation
+            }
+        
+        else:
+            raise HTTPException(status_code=400, detail=f"Invalid operation: {request.operation}")
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Apply AI operation error: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Operation failed: {str(e)}")
+
 # ==================== CODE COMPLETION ENDPOINT ====================
 
 @api_router.post("/code/complete", response_model=CodeCompletionResponse)
