@@ -120,6 +120,38 @@ class CodeExecutionResponse(BaseModel):
     error: Optional[str] = None
     execution_time: float
 
+class AIFileOperation(BaseModel):
+    operation: str  # 'create', 'edit', 'refactor'
+    file_name: str
+    file_path: str
+    content: str
+    language: str
+    description: str
+
+class EnhancedChatRequest(BaseModel):
+    message: str
+    session_id: str
+    project_id: str
+    current_file_id: Optional[str] = None
+    provider: str = "openai"
+    model: str = "gpt-5.2"
+    include_project_context: bool = True
+
+class EnhancedChatResponse(BaseModel):
+    response: str
+    session_id: str
+    suggested_operations: List[AIFileOperation] = []
+    code_blocks: List[Dict[str, Any]] = []
+
+class ApplyAIOperationRequest(BaseModel):
+    project_id: str
+    operation: str  # 'create', 'edit', 'refactor'
+    file_id: Optional[str] = None
+    file_name: str
+    file_path: str
+    content: str
+    language: str
+
 # ==================== PROJECT ENDPOINTS ====================
 
 @api_router.post("/projects", response_model=Project)
