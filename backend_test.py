@@ -100,7 +100,8 @@ class MobileIDEAPITester:
             if response.status_code == 200:
                 data = response.json()
                 if isinstance(data, list):
-                    project_found = any(p.get("id") == self.test_project_id for p in data)
+                    # Handle both 'id' and '_id' fields in project list
+                    project_found = any(p.get("id") == self.test_project_id or p.get("_id") == self.test_project_id for p in data)
                     if project_found:
                         self.log_result("Get Projects", True, f"Found {len(data)} projects including test project")
                         return True
