@@ -38,6 +38,10 @@ export default function RootLayout() {
           name="chat" 
           options={{ title: 'AI Assistant' }} 
         />
+        <Stack.Screen 
+          name="ai-chat/[projectId]" 
+          options={{ title: 'Enhanced AI Assistant' }} 
+        />
       </Stack>
     </>
   );
