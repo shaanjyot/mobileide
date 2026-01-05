@@ -222,6 +222,16 @@ export default function EditorScreen() {
     });
   };
 
+  const openEnhancedAIChat = () => {
+    router.push({
+      pathname: `/ai-chat/${id}`,
+      params: { 
+        projectId: id,
+        currentFileId: selectedFile?._id || '',
+      },
+    });
+  };
+
   if (loading) {
     return (
       <View style={styles.centerContainer}>
