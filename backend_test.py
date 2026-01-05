@@ -166,8 +166,10 @@ class MobileIDEAPITester:
             
             if response.status_code == 200:
                 data = response.json()
-                if "id" in data and data["name"] == file_data["name"]:
-                    self.test_file_id = data["id"]
+                # Handle both 'id' and '_id' fields
+                file_id = data.get("id") or data.get("_id")
+                if file_id and data["name"] == file_data["name"]:
+                    self.test_file_id = file_id
                     self.log_result("Create File", True, f"Created file with ID: {self.test_file_id}")
                     return True
                 else:
