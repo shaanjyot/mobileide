@@ -76,8 +76,10 @@ class MobileIDEAPITester:
             
             if response.status_code == 200:
                 data = response.json()
-                if "id" in data and data["name"] == project_data["name"]:
-                    self.test_project_id = data["id"]
+                # Handle both 'id' and '_id' fields
+                project_id = data.get("id") or data.get("_id")
+                if project_id and data["name"] == project_data["name"]:
+                    self.test_project_id = project_id
                     self.log_result("Create Project", True, f"Created project with ID: {self.test_project_id}")
                     return True
                 else:
