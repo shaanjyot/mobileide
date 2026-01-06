@@ -111,52 +111,35 @@ export default function EnhancedAIChatScreen() {
 
   const applyCodeToCurrentFile = async (code: string, language: string) => {
     if (!currentFileId) {
-      Alert.alert(
-        'Create New File',
-        'No file is currently open. Would you like to create a new file with this code?',
-        [
-          { text: 'Cancel', style: 'cancel' },
-          {
-            text: 'Create File',
-            onPress: () => {
-              setPendingCode(code);
-              setPendingLanguage(language);
-              setShowFileModal(true);
-            },
-          },
-        ]
-      );
+      // No file open - create new file
+      setPendingCode(code);
+      setPendingLanguage(language);
+      setShowFileModal(true);
       return;
     }
 
-    Alert.alert(
-      'Apply Code',
-      'Replace the current file content with this code?',
-      [
-        { text: 'Cancel', style: 'cancel' },
+    try {
+      // Automatically apply code to current file
+      await axios.post(`${API_URL}/api/ai/apply-operation`, {
+        project_id: projectId,
+        operation: 'edit',
+        file_id: currentFileId,
+        file_name: '',
+        file_path: '',
+        content: code,
+        language: language,
+      });
+      
+      Alert.alert('Success', 'Code applied to file! Returning to editor...', [
         {
-          text: 'Apply',
-          onPress: async () => {
-            try {
-              await axios.post(`${API_URL}/api/ai/apply-operation`, {
-                project_id: projectId,
-                operation: 'edit',
-                file_id: currentFileId,
-                file_name: '',
-                file_path: '',
-                content: code,
-                language: language,
-              });
-              Alert.alert('Success', 'Code applied to current file!');
-              router.back();
-            } catch (error) {
-              console.error('Error applying code:', error);
-              Alert.alert('Error', 'Failed to apply code');
-            }
-          },
+          text: 'OK',
+          onPress: () => router.back(),
         },
-      ]
-    );
+      ]);
+    } catch (error) {
+      console.error('Error applying code:', error);
+      Alert.alert('Error', 'Failed to apply code');
+    }
   };
 
   const createNewFileWithCode = async () => {
