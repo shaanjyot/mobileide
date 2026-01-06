@@ -35,12 +35,8 @@ export default function RootLayout() {
           options={{ title: 'Editor' }} 
         />
         <Stack.Screen 
-          name="chat" 
-          options={{ title: 'AI Assistant' }} 
-        />
-        <Stack.Screen 
           name="ai-chat/[projectId]" 
-          options={{ title: 'Enhanced AI Assistant' }} 
+          options={{ title: 'AI Assistant' }} 
         />
       </Stack>
     </>
