@@ -214,14 +214,6 @@ export default function EditorScreen() {
     );
   };
 
-  const openAIChat = () => {
-    const context = selectedFile ? `File: ${selectedFile.name}\n${selectedFile.content}` : '';
-    router.push({
-      pathname: '/chat',
-      params: { context },
-    });
-  };
-
   const openEnhancedAIChat = () => {
     router.push({
       pathname: `/ai-chat/${id}`,
